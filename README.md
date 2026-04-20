@@ -150,9 +150,7 @@ exports to:
 | baz | qux |
 ```
 
-### Other Quarto markup
-
-For Quarto markup that is not covered by special blocks, you can pass native Quarto/Pandoc markup directly. In some cases, `ox-md` will insert escape characters that cause inconsistencies in rendered content. You should consider using a `markdown` export block when you run into problems.
+### Code blocks
 
 Inline source blocks (`src_LANGUAGE{code}`) are exported as inline code with the language prefix:
 
@@ -175,6 +173,12 @@ hist(rnorm(100))
 ```
 
 I've not yet made an effort to parse output from `org-babel` computations, which means that code chunk options are the primary means to format figures, tables, and other output. At some point I hope to add parsing of Org captions and labels.
+
+
+### Other Quarto markup
+
+For Quarto markup that is not covered by special blocks, you can pass native Quarto/Pandoc markup directly. In some cases, `ox-md` will insert escape characters that cause inconsistencies in rendered content. You should consider using a `markdown` export block when you run into problems.
+
 
 ### Keybindings
 
