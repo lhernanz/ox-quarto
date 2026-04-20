@@ -62,6 +62,9 @@
                      (plain-text . org-quarto-plain-text)
                      (special-block . org-quarto-special-block)
                      (src-block . org-quarto-src-block)
+                     (table . org-quarto-table)
+                     (table-cell . org-quarto-table-cell)
+                     (table-row . org-quarto-table-row)
                      (template . org-quarto-template))
   :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil space)
                    (:quarto-options "QUARTO_OPTIONS" nil nil space)
@@ -372,6 +375,33 @@ callout titles)."
             ;; intentional (e.g., callout titles).
             (replace-regexp-in-string "\\\\#" "#" contents)
             ":::\n")))
+
+
+;; Tables
+
+(defun org-quarto-table-cell (table-cell contents _info)
+  "Transcode a TABLE-CELL element into a Markdown pipe table cell."
+  (concat " " (org-trim (or contents "")) " |"))
+
+(defun org-quarto-table-row (table-row contents _info)
+  "Transcode a TABLE-ROW element into a Markdown pipe table row.
+Rule rows (separator lines in Org) become Markdown header separators."
+  (if (eq (org-element-property :type table-row) 'rule)
+      (let* ((table (org-element-parent table-row))
+             (ncols (length (org-element-contents
+                             (cl-find-if
+                              (lambda (row)
+                                (eq (org-element-property :type row) 'standard))
+                              (org-element-contents table))))))
+        (concat "|" (apply #'concat (make-list ncols " --- |"))))
+    (concat "|" contents)))
+
+(defun org-quarto-table (table contents info)
+  "Transcode a TABLE element into a Markdown pipe table.
+Only org-type tables are handled; table.el tables fall back to HTML."
+  (if (eq (org-element-property :type table) 'org)
+      contents
+    (org-html-table table contents info)))
 
 
 ;; Links
