@@ -216,20 +216,19 @@ setting the target format."
 
 ;; Generate YAML frontmatter
 (defun org-quarto--wrangle-options (opts-str)
-  "Parse a string of space-separated KEY:VALUE pairs into a YAML block."
+  "Parse a string of KEY:VALUE pairs into a YAML block.
+Values may be plain tokens or bracket-enclosed lists like [a, b, c]."
   (if (not (and opts-str (stringp opts-str)))
       ""
-    (let* ((opts-list (split-string opts-str "[ \t\n]+" t))
-           (result-lines '())
-           (current-pair nil))
-      (while opts-list
-        (setq current-pair (pop opts-list))
-        (if (stringp current-pair)
-            (let ((parts (split-string current-pair ":" t)))
-              (if (cdr parts)
-                  (push (concat (car parts) ": " (cadr parts)) result-lines)
-                (push current-pair result-lines)))))
-      (mapconcat 'identity (nreverse result-lines) "\n"))))
+    (let ((result-lines '())
+          (remaining (string-trim opts-str)))
+      (while (string-match
+              "\\([^: \t\n]+\\):\\(\\[[^]]*\\]\\|[^ \t\n]+\\)"
+              remaining)
+        (push (concat (match-string 1 remaining) ": " (match-string 2 remaining))
+              result-lines)
+        (setq remaining (string-trim-left (substring remaining (match-end 0)))))
+      (mapconcat #'identity (nreverse result-lines) "\n"))))
 
 (defun org-quarto--read-file-contents (filename)
   "Read the contents of FILENAME and return them as a string.
@@ -253,6 +252,39 @@ are returned.  Otherwise VALUE is returned as inline YAML."
     (if (file-exists-p candidate)
         (org-quarto--read-file-contents candidate)
       value)))
+
+(defun org-quarto--collect-format-opts (info)
+  "Return an alist of (FORMAT . OPTS-STR) from QUARTO_FORMAT_OPTIONS keywords.
+INFO is the export state plist.  Multiple entries for the same format are
+merged with a space separator.  FORMAT is lowercased."
+  (let ((result '()))
+    (org-element-map (plist-get info :parse-tree) 'keyword
+      (lambda (kw)
+        (let ((key (org-element-property :key kw))
+              (val (org-element-property :value kw)))
+          (when (string-match "\\`QUARTO_\\([A-Z0-9]+\\)_OPTIONS\\'" key)
+            (let* ((fmt (downcase (match-string 1 key)))
+                   (existing (assoc fmt result)))
+              (if existing
+                  (setcdr existing (concat (cdr existing) " " val))
+                (push (cons fmt val) result)))))))
+    (nreverse result)))
+
+(defun org-quarto--format-specific-yaml (format-opts)
+  "Return a YAML `format:' block from FORMAT-OPTS alist.
+Each element is (FORMAT-NAME . OPTS-STR)."
+  (concat "\nformat:\n"
+          (mapconcat
+           (lambda (pair)
+             (let* ((fmt (car pair))
+                    (opts (org-quarto--wrangle-options (cdr pair)))
+                    (opt-lines (split-string opts "\n" t)))
+               (concat "  " fmt ":\n"
+                       (mapconcat (lambda (line) (concat "    " line))
+                                  opt-lines "\n"))))
+           format-opts
+           "\n")
+          "\n"))
 
 (defun org-quarto-yaml-frontmatter (info)
   "Return YAML frontmatter string from INFO for Quarto Markdown export."
@@ -289,6 +321,10 @@ are returned.  Otherwise VALUE is returned as inline YAML."
      ;; Wrangle and format QUARTO_OPTIONS
      (when quarto_opts
        (concat (org-quarto--wrangle-options quarto_opts) "\n"))
+     ;; Format-specific options: QUARTO_<FORMAT>_OPTIONS
+     (let ((format-opts (org-quarto--collect-format-opts info)))
+       (when format-opts
+         (org-quarto--format-specific-yaml format-opts)))
      "---\n\n")))
 
 
