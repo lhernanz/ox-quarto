@@ -16,16 +16,35 @@ The package is in the early stages of development, and help from folks with more
 
 ### Document options
 
-For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of contents directly in the `.qmd` document. `ox-quarto` will use Org's `TITLE`, `AUTHOR`, `DATE`, and `BIBLIOGRAPHY` fields, if available. If you have multiple bibliographies, you can use multiple `#+BIBLIOGRAPHY:` lines and they will be properly formatted as a YAML array.
+For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of contents directly in the `.qmd` document. `ox-quarto` will use Org's `TITLE`, `SUBTITLE`, `AUTHOR`, `DATE`, and `BIBLIOGRAPHY` fields, if available. If you have multiple bibliographies, you can use multiple `#+BIBLIOGRAPHY:` lines and they will be properly formatted as a YAML array.
 
 | Option | Description |
 |:---|:---|
 | `#+QUARTO_OPTIONS` | Pass elements to Quarto's YAML frontmatter (ex., `toc:true toc-depth:2`). Multiple lines are concatenated automatically. |
-| `#+QUARTO_FRONTMATTER` | The name of a file containing YAML frontmatter content. Inserted as-is into the `.qmd` frontmatter block. |
+| `#+QUARTO_FRONTMATTER` | A filename or inline YAML to insert into the frontmatter block. Filenames are resolved relative to the `.org` file's directory. |
+| `#+QUARTO_<FORMAT>_OPTIONS` | Format-specific options placed under Quarto's `format:` key. Replace `<FORMAT>` with any Quarto output format (ex., `#+QUARTO_HTML_OPTIONS: toc:true`, `#+QUARTO_PDF_OPTIONS: toc:false`). Multiple lines and multiple formats are supported. |
 | `#+QUARTO_PREVIEW_ARGS` | Pass command line arguments to `quarto preview` when running preview from the export menu (ex., `--port 4444`). Can be specified across multiple lines. |
 | `#+QUARTO_RENDER_ARGS` | Pass command line arguments to `quarto render` when rendering from the export menu (ex., `--output testfile.docx`). Can be specified across multiple lines. |
 
 `ox-quarto` does not check for duplicate keys in the frontmatter, so if you use Org's `DATE` field and set `date` again in `QUARTO_OPTIONS` or your `QUARTO_FRONTMATTER` file, you will get a compilation error from `quarto-cli`.
+
+#### Format-specific options example
+
+```org
+#+QUARTO_HTML_OPTIONS: toc:true code-fold:true
+#+QUARTO_PDF_OPTIONS: toc:false
+```
+
+exports to:
+
+```yaml
+format:
+  html:
+    toc: true
+    code-fold: true
+  pdf:
+    toc: false
+```
 
 ### Citations
 
@@ -33,6 +52,14 @@ For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of co
 
 - **`org-cite`**: Fully supported natively. When using the `org-cite` syntax (e.g., `[cite:@key1;@key2]`), `ox-quarto` registers a custom export processor that translates the citations, prefixes, and locators into valid Pandoc Markdown citations (`[@key1; @key2]`).
 - **`org-ref`**: `ox-quarto` intercepts `org-ref` citation links (e.g., `cite:key1,key2`) and converts them into properly formatted Pandoc equivalents.
+
+The following `org-cite` citation styles are supported:
+
+| Style | Org syntax | Output |
+|:---|:---|:---|
+| Default (parenthetical) | `[cite:@key]` | `[@key]` |
+| Suppress author (`:na`) | `[cite/na:@key]` | `[-@key]` |
+| Text citation (`:t`) | `[cite/t:@key]` | `@key` |
 
 ### Quarto blocks (fenced divs)
 
@@ -93,9 +120,49 @@ This is a collapsible note.
 :::
 ```
 
+### Footnotes
+
+`ox-quarto` supports all three Org footnote forms:
+
+| Form | Org syntax | Output |
+|:---|:---|:---|
+| Standard reference | `[fn:ID]` with a separate `[fn:ID] content` definition | `[^ID]` / `[^ID]: content` |
+| Named inline | `[fn:ID: content]` | `[^ID]` with definition appended after the paragraph |
+| Anonymous inline | `[fn:: content]` | `^[content]` |
+
+### Tables
+
+Org tables are exported as Markdown pipe tables. A horizontal rule in the Org table becomes the header separator row. `table.el`-style tables fall back to HTML export.
+
+```org
+| Column A | Column B |
+|----------+----------|
+| foo      | bar      |
+| baz      | qux      |
+```
+
+exports to:
+
+```markdown
+| Column A | Column B |
+| --- | --- |
+| foo | bar |
+| baz | qux |
+```
+
 ### Other Quarto markup
 
 For Quarto markup that is not covered by special blocks, you can pass native Quarto/Pandoc markup directly. In some cases, `ox-md` will insert escape characters that cause inconsistencies in rendered content. You should consider using a `markdown` export block when you run into problems.
+
+Inline source blocks (`src_LANGUAGE{code}`) are exported as inline code with the language prefix:
+
+```org
+The mean is src_R{mean(x)}.
+```
+
+exports to:
+
+``` `r mean(x)` ```
 
 Feed YAML arguments for computations within source code blocks just as you would in native Quarto:
 
@@ -119,6 +186,8 @@ I've not yet made an effort to parse output from `org-babel` computations, which
 | `C-c C-e Q p` | To file and preview (runs `quarto preview`) |
 | `C-c C-e Q h` | To HTML and preview (runs `quarto preview --to html`) |
 | `C-c C-e Q r` | To file and render (runs `quarto render`)   |
+
+`M-x org-quarto-convert-region-to-qmd` converts a selected region of Org syntax to Quarto Markdown in place. This can be used in any buffer.
 
 
 ## Testing
