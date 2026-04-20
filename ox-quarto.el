@@ -160,10 +160,16 @@ Doing so will open HTML output from the QMD file in a browser."
          (info (org-export-get-environment 'quarto))
          (args (plist-get info :quarto-preview-args))
          (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
-         (process-args (append (list "preview" (expand-file-name outfile)) args-list)))
-    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
-    (apply #'start-process "quarto-preview" "*quarto-preview*" "quarto" process-args)
-    (display-buffer "*quarto-preview*")))
+         (cmd (mapconcat #'shell-quote-argument
+                         (append (list "quarto" "preview" (expand-file-name outfile)) args-list)
+                         " ")))
+    (let ((display-buffer-alist
+           (cons '("\\*quarto-preview\\*"
+                   (display-buffer-in-side-window)
+                   (side . bottom)
+                   (window-height . 0.25))
+                 display-buffer-alist)))
+      (compilation-start cmd nil (lambda (_) "*quarto-preview*")))))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-preview-html (&optional async subtreep visible-only)
@@ -176,10 +182,16 @@ setting the target format."
          (info (org-export-get-environment 'quarto))
          (args (plist-get info :quarto-preview-args))
          (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
-         (process-args (append (list "preview" (expand-file-name outfile) "--to" "html") args-list)))
-    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
-    (apply #'start-process "quarto-preview" "*quarto-preview*" "quarto" process-args)
-    (display-buffer "*quarto-preview*")))
+         (cmd (mapconcat #'shell-quote-argument
+                         (append (list "quarto" "preview" (expand-file-name outfile) "--to" "html") args-list)
+                         " ")))
+    (let ((display-buffer-alist
+           (cons '("\\*quarto-preview\\*"
+                   (display-buffer-in-side-window)
+                   (side . bottom)
+                   (window-height . 0.25))
+                 display-buffer-alist)))
+      (compilation-start cmd nil (lambda (_) "*quarto-preview*")))))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-render (&optional async subtreep visible-only)
@@ -190,10 +202,16 @@ setting the target format."
          (info (org-export-get-environment 'quarto))
          (args (plist-get info :quarto-render-args))
          (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
-         (process-args (append (list "render" (expand-file-name outfile)) args-list)))
-    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
-    (apply #'start-process "quarto-render" "*quarto-render*" "quarto" process-args)
-    (display-buffer "*quarto-render*")))
+         (cmd (mapconcat #'shell-quote-argument
+                         (append (list "quarto" "render" (expand-file-name outfile)) args-list)
+                         " ")))
+    (let ((display-buffer-alist
+           (cons '("\\*quarto-render\\*"
+                   (display-buffer-in-side-window)
+                   (side . bottom)
+                   (window-height . 0.25))
+                 display-buffer-alist)))
+      (compilation-start cmd nil (lambda (_) "*quarto-render*")))))
 
 
 ;; Generate YAML frontmatter
