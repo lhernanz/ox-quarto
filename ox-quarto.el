@@ -53,7 +53,8 @@
         (?r "To file and render"
             (lambda (a s v b)
               (org-quarto-export-to-qmd-and-render a s v)))))
-  :translate-alist '((footnote-definition . org-quarto-footnote-definition)
+  :translate-alist '((entity . org-quarto-entity)
+                     (footnote-definition . org-quarto-footnote-definition)
                      (footnote-reference . org-quarto-footnote-reference)
                      (inline-src-block . org-quarto-inline-src-block)
                      (inner-template . org-quarto-inner-template)
@@ -71,6 +72,21 @@
                    (:quarto-preview-args "QUARTO_PREVIEW_ARGS" nil nil space)
                    (:quarto-render-args "QUARTO_RENDER_ARGS" nil nil space)
                    (:bibliography "BIBLIOGRAPHY" nil nil space)))
+
+
+;;; Transcoders
+
+;; Entities
+
+(defun org-quarto-entity (entity _contents _info)
+  "Transcode an ENTITY object from Org to Quarto Markdown.
+Entities that require math mode (e.g. \\beta) are wrapped in inline math
+delimiters ($...$).  Other entities fall back to their UTF-8 representation."
+  (let ((latex (org-element-property :latex entity))
+        (math-p (org-element-property :latex-math-p entity)))
+    (if math-p
+        (format "$%s$" latex)
+      (or (org-element-property :utf-8 entity) latex))))
 
 
 ;;; Utilities
@@ -262,7 +278,7 @@ merged with a space separator.  FORMAT is lowercased."
       (lambda (kw)
         (let ((key (org-element-property :key kw))
               (val (org-element-property :value kw)))
-          (when (string-match "\\`QUARTO_\\([A-Z0-9]+\\)_OPTIONS\\'" key)
+          (when (string-match "\\`QUARTO_\\([A-Z0-9][A-Z0-9-]*\\)_OPTIONS\\'" key)
             (let* ((fmt (downcase (match-string 1 key)))
                    (existing (assoc fmt result)))
               (if existing
