@@ -46,6 +46,50 @@ format:
     toc: false
 ```
 
+Quarto extension format names that contain hyphens are supported:
+
+```org
+#+QUARTO_ACM-PDF_OPTIONS: toc:false fontsize:11pt
+```
+
+#### Merging with `#+QUARTO_FRONTMATTER`
+
+When a `#+QUARTO_FRONTMATTER` file (or inline block) already contains a `format:` section, `ox-quarto` merges it with any `#+QUARTO_<FORMAT>_OPTIONS` keywords rather than emitting two separate `format:` keys. The merged output contains a single `format:` block with a single sub-block per format.
+
+Precedence rules:
+- If the same format+key appears in both the frontmatter and a `#+QUARTO_<FORMAT>_OPTIONS` line, the value from the org file takes precedence.
+- Keys present in only one source are included unchanged.
+
+For example, given a frontmatter file containing:
+
+```yaml
+format:
+  pdf:
+    toc: true
+    header-includes: |
+      \usepackage{booktabs}
+```
+
+and the org file:
+
+```org
+#+QUARTO_FRONTMATTER: frontmatter.yaml
+#+QUARTO_PDF_OPTIONS: toc:false fontsize:12pt
+```
+
+the exported frontmatter will contain:
+
+```yaml
+format:
+  pdf:
+    toc: false
+    header-includes: |
+      \usepackage{booktabs}
+    fontsize: 12pt
+```
+
+**Note:** The merge parser handles YAML block scalars (`|`, `>`) and preserves their content verbatim. Nested mappings under a format key (e.g., a `shift-heading-level-by` sub-map) are not parsed and should be kept exclusively in the frontmatter file.
+
 ### Citations
 
 `ox-quarto` supports native Quarto/Pandoc citation generation.

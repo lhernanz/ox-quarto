@@ -286,21 +286,131 @@ merged with a space separator.  FORMAT is lowercased."
                 (push (cons fmt val) result)))))))
     (nreverse result)))
 
-(defun org-quarto--format-specific-yaml (format-opts)
-  "Return a YAML `format:' block from FORMAT-OPTS alist.
-Each element is (FORMAT-NAME . OPTS-STR)."
-  (concat "\nformat:\n"
-          (mapconcat
-           (lambda (pair)
-             (let* ((fmt (car pair))
-                    (opts (org-quarto--wrangle-options (cdr pair)))
-                    (opt-lines (split-string opts "\n" t)))
-               (concat "  " fmt ":\n"
-                       (mapconcat (lambda (line) (concat "    " line))
-                                  opt-lines "\n"))))
-           format-opts
-           "\n")
-          "\n"))
+(defun org-quarto--parse-opts-str-to-alist (opts-str)
+  "Parse OPTS-STR of KEY:VALUE pairs into an alist of (KEY . VALUE) strings.
+Uses the same tokenization as `org-quarto--wrangle-options'."
+  (let ((result '())
+        (remaining (string-trim opts-str)))
+    (while (string-match
+            "\\([^: \t\n]+\\):\\(\\[[^]]*\\]\\|[^ \t\n]+\\)"
+            remaining)
+      (push (cons (match-string 1 remaining)
+                  (match-string 2 remaining))
+            result)
+      (setq remaining (string-trim-left (substring remaining (match-end 0)))))
+    (nreverse result)))
+
+(defun org-quarto--strip-and-parse-format-block (yaml-str)
+  "Remove the top-level `format:' block from YAML-STR and parse it.
+Returns (STRIPPED-YAML . FORMAT-ALIST) where STRIPPED-YAML has the
+`format:' key and all its nested content removed, and FORMAT-ALIST is an
+alist of (FORMAT-NAME . ((KEY . VALUE) ...)) built from the block.
+Block scalar values (indicated by `|' or `>') are preserved verbatim,
+including their continuation lines.  Nested mappings are not supported."
+  (let ((lines (split-string yaml-str "\n"))
+        (state 'top)
+        (current-fmt nil)
+        (current-key nil)
+        (format-alist '())
+        (stripped '()))
+    (cl-flet ((add-opt (key val)
+                (let ((entry (assoc current-fmt format-alist)))
+                  (when entry
+                    (setcdr entry (append (cdr entry) (list (cons key val)))))
+                  (setq current-key key)
+                  (when (string-match "\\`[|>][-+]?\\'" val)
+                    (setq state 'in-block-scalar)))))
+      (dolist (line lines)
+        (pcase state
+          ('top
+           (if (string-match "\\`format:[[:space:]]*\\'" line)
+               (setq state 'in-format)
+             (push line stripped)))
+          ('in-block-scalar
+           (cond
+            ;; Blank line or 6+-space continuation: append to current key's value
+            ((or (string-match "\\`[[:space:]]*\\'" line)
+                 (string-match "\\`      " line))
+             (let* ((entry (assoc current-fmt format-alist))
+                    (key-entry (when entry (assoc current-key (cdr entry)))))
+               (when key-entry
+                 (setcdr key-entry (concat (cdr key-entry) "\n" line)))))
+            ;; 4-space indent: new option, exit block scalar
+            ((string-match "\\`    \\([^: \t]+\\):[[:space:]]*\\(.*\\)\\'" line)
+             (setq state 'in-format-entry)
+             (add-opt (match-string 1 line) (string-trim (match-string 2 line))))
+            ;; 2-space indent: new format name, exit block scalar
+            ((string-match "\\`  \\([a-zA-Z0-9_-]+\\):[[:space:]]*\\'" line)
+             (setq state 'in-format-entry)
+             (setq current-fmt (match-string 1 line))
+             (setq current-key nil)
+             (unless (assoc current-fmt format-alist)
+               (push (cons current-fmt '()) format-alist)))
+            ;; Non-indented non-blank: new top-level key
+            ((string-match "\\`[^ \t]" line)
+             (setq state 'top)
+             (setq current-fmt nil)
+             (setq current-key nil)
+             (push line stripped))))
+          ((or 'in-format 'in-format-entry)
+           (cond
+            ;; Blank line: stay in current state
+            ((string-match "\\`[[:space:]]*\\'" line) nil)
+            ;; 4-space indent: key-value option under current format
+            ((and current-fmt
+                  (string-match "\\`    \\([^: \t]+\\):[[:space:]]*\\(.*\\)\\'" line))
+             (add-opt (match-string 1 line) (string-trim (match-string 2 line))))
+            ;; 2-space indent: format sub-key (format name)
+            ((string-match "\\`  \\([a-zA-Z0-9_-]+\\):[[:space:]]*\\'" line)
+             (setq current-fmt (match-string 1 line))
+             (setq current-key nil)
+             (unless (assoc current-fmt format-alist)
+               (push (cons current-fmt '()) format-alist))
+             (setq state 'in-format-entry))
+            ;; Non-indented non-blank: new top-level key
+            ((string-match "\\`[^ \t]" line)
+             (setq state 'top)
+             (setq current-fmt nil)
+             (setq current-key nil)
+             (push line stripped)))))))
+    (cons (string-trim-right (mapconcat #'identity (nreverse stripped) "\n"))
+          (nreverse format-alist))))
+
+(defun org-quarto--merge-format-alists (base override)
+  "Merge BASE and OVERRIDE format alists; OVERRIDE takes precedence on conflicts.
+Both are ((format-name . ((key . value) ...)) ...).
+Formats present in only one alist are included unchanged."
+  (let ((result (mapcar (lambda (p) (cons (car p) (copy-alist (cdr p)))) base)))
+    (dolist (fmt-pair override)
+      (let* ((fmt (car fmt-pair))
+             (override-opts (cdr fmt-pair))
+             (base-entry (assoc fmt result)))
+        (if base-entry
+            (dolist (opt override-opts)
+              (let ((existing (assoc (car opt) (cdr base-entry))))
+                (if existing
+                    (setcdr existing (cdr opt))
+                  (setcdr base-entry (append (cdr base-entry) (list opt))))))
+          (push (cons fmt (copy-alist override-opts)) result))))
+    result))
+
+(defun org-quarto--format-alist-to-yaml (format-alist)
+  "Return a YAML `format:' block string from FORMAT-ALIST.
+FORMAT-ALIST is ((format-name . ((key . value) ...)) ...)."
+  (when format-alist
+    (concat "\nformat:\n"
+            (mapconcat
+             (lambda (fmt-pair)
+               (let ((fmt-name (car fmt-pair))
+                     (opts (cdr fmt-pair)))
+                 (concat "  " fmt-name ":\n"
+                         (mapconcat (lambda (opt)
+                                      (concat "    " (car opt) ": "
+                                              (string-trim-right (cdr opt))))
+                                    opts "\n"))))
+             format-alist
+             "\n")
+            "\n")))
 
 (defun org-quarto-yaml-frontmatter (info)
   "Return YAML frontmatter string from INFO for Quarto Markdown export."
@@ -332,15 +442,30 @@ Each element is (FORMAT-NAME . OPTS-STR)."
            (concat "bibliography:\n"
                    (mapconcat (lambda (b) (format "  - %s" b)) bibs "\n")
                    "\n"))))
-     (when quarto_yml
-       (format "%s\n" (org-quarto--resolve-frontmatter quarto_yml info)))
-     ;; Wrangle and format QUARTO_OPTIONS
-     (when quarto_opts
-       (concat (org-quarto--wrangle-options quarto_opts) "\n"))
-     ;; Format-specific options: QUARTO_<FORMAT>_OPTIONS
-     (let ((format-opts (org-quarto--collect-format-opts info)))
-       (when format-opts
-         (org-quarto--format-specific-yaml format-opts)))
+     ;; Frontmatter YAML and #+QUARTO_<FORMAT>_OPTIONS are merged into a
+     ;; single `format:' block.  When both define options for the same
+     ;; format+key, the #+QUARTO_<FORMAT>_OPTIONS value takes precedence.
+     (let* ((format-opts (org-quarto--collect-format-opts info))
+            (org-fmt-alist
+             (when format-opts
+               (mapcar (lambda (p)
+                         (cons (car p)
+                               (org-quarto--parse-opts-str-to-alist (cdr p))))
+                       format-opts)))
+            (raw-fm (when quarto_yml
+                      (org-quarto--resolve-frontmatter quarto_yml info)))
+            (fm-stripped-parsed (when (and raw-fm org-fmt-alist)
+                                  (org-quarto--strip-and-parse-format-block raw-fm)))
+            (stripped-fm (cond (fm-stripped-parsed (car fm-stripped-parsed))
+                               (t raw-fm)))
+            (fm-fmt-alist (when fm-stripped-parsed (cdr fm-stripped-parsed)))
+            (merged-fmt (org-quarto--merge-format-alists fm-fmt-alist org-fmt-alist)))
+       (concat
+        (when (and stripped-fm (org-string-nw-p stripped-fm))
+          (format "%s\n" stripped-fm))
+        (when quarto_opts
+          (concat (org-quarto--wrangle-options quarto_opts) "\n"))
+        (org-quarto--format-alist-to-yaml merged-fmt)))
      "---\n\n")))
 
 
