@@ -693,20 +693,35 @@ Multiple #+ATTR_QUARTO: lines are supported and merged."
 
 ;; Links
 
+(defconst org-quarto--xref-prefix-regexp
+  (rx bos
+      (or "fig" "tbl" "lst" "eq" "sec"
+          "thm" "lem" "cor" "prp" "cnj" "def" "exm" "exr" "sol" "rem" "alg"
+          "tip" "nte" "wrn" "imp" "cau")
+      "-")
+  "Regexp matching Quarto cross-reference ID prefixes.")
+
 (defun org-quarto-link (link desc info)
-  "Transcode org-ref citation LINK and DESC to Quarto format.
-For other types of links, default to `org-md-link'. INFO is a plist used as a
+  "Transcode LINK and DESC to Quarto format.
+Handles org-ref citations and Quarto cross-references; falls back to
+`org-md-link' for all other link types.  INFO is a plist used as a
 communication channel."
-  (if (string= "cite" (org-element-property :type link))
-      (let* ((path (org-element-property :path link))
-             (clean-path (replace-regexp-in-string "\\&" "" path))
+  (let ((type (org-element-property :type link))
+        (path (org-element-property :path link)))
+    (cond
+     ((string= type "cite")
+      (let* ((clean-path (replace-regexp-in-string "\\&" "" path))
              (keys (split-string clean-path ",")))
         (concat "["
                 (mapconcat (lambda (k)
                              (concat "@" (replace-regexp-in-string "^@" "" k)))
                            keys "; ")
-                "]"))
-    (org-md-link link desc info)))
+                "]")))
+     ((and (string= type "fuzzy")
+           (string-match-p org-quarto--xref-prefix-regexp path))
+      (concat "@" path))
+     (t
+      (org-md-link link desc info)))))
 
 
 ;; Plain text

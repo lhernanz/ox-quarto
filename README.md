@@ -105,6 +105,20 @@ The following `org-cite` citation styles are supported:
 | Suppress author (`:na`) | `[cite/na:@key]` | `[-@key]` |
 | Text citation (`:t`) | `[cite/t:@key]` | `@key` |
 
+### Cross-references
+
+Bare internal links whose targets begin with one of [Quarto's reserved cross-reference prefixes](https://quarto.org/docs/authoring/cross-references.html) (`fig-`, `tbl-`, `sec-`, `eq-`, etc.) are transcoded to `@`-references:
+
+```org
+See [[fig-myfig]].
+```
+
+exports to:
+
+```markdown
+See @fig-myfig.
+```
+
 ### Quarto blocks (fenced divs)
 
 `ox-quarto` supports Quarto's fenced div syntax (`:::`) through Org special blocks. The block name becomes the CSS class in the exported `.qmd` file.
