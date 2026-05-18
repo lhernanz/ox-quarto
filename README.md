@@ -208,18 +208,20 @@ exports to:
 | baz      | qux      |
 ```
 
-Use `#+CAPTION` for the table caption and `#+ATTR_QUARTO:` for alignment and cross-reference labels:
+Use `#+CAPTION` for the table caption, `#+NAME` for the cross-reference label, and `#+ATTR_QUARTO:` for alignment:
 
-| `#+ATTR_QUARTO:` key | Description |
+| Keyword | Description |
 |:---|:---|
-| `:align` | Alignment string, one character per column: `l` (left), `r` (right), `c` (center), other (default). |
-| `:label` | Cross-reference label (e.g. `tbl-mytable`). |
+| `#+NAME` | Cross-reference label (e.g. `tbl-mytable`). Takes precedence over `:label`. |
+| `#+ATTR_QUARTO: :align` | Alignment string, one character per column: `l` (left), `r` (right), `c` (center), other (default). |
+| `#+ATTR_QUARTO: :label` | Fallback cross-reference label if `#+NAME` is absent. |
 
 Multiple `#+ATTR_QUARTO:` lines are supported and merged.
 
 ```org
+#+NAME: tbl-example
 #+CAPTION: This is a caption.
-#+ATTR_QUARTO: :label tbl-example :align lrcd
+#+ATTR_QUARTO: :align lrcd
 | Col1       | Col2 | Col3 | Col4 |
 |------------+------+------+------|
 | Some stuff |    2 |    6 |   10 |

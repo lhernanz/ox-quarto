@@ -653,10 +653,11 @@ is replaced with proper widths and alignment by `org-quarto-table'."
   "Transcode a TABLE element into a Markdown pipe table.
 Only org-type tables are handled; table.el tables fall back to HTML.
 
-#+CAPTION sets the table caption.  #+ATTR_QUARTO: accepts:
+#+CAPTION sets the table caption.  #+NAME sets the cross-reference label
+\(e.g. `#+NAME: tbl-mytable').  #+ATTR_QUARTO: accepts:
   :align   Alignment string, one character per column (l/r/c/other).
            Colons replace dashes in the separator to indicate alignment.
-  :label   Cross-reference label emitted as `{#label}' after the caption.
+  :label   Fallback cross-reference label; #+NAME takes precedence.
 
 Multiple #+ATTR_QUARTO: lines are supported and merged."
   (if (not (eq (org-element-property :type table) 'org))
@@ -664,8 +665,9 @@ Multiple #+ATTR_QUARTO: lines are supported and merged."
     (let* ((attr (org-export-read-attribute :attr_quarto table))
            (align-spec (let ((a (plist-get attr :align)))
                          (when a (if (stringp a) a (format "%s" a)))))
-           (label (let ((l (plist-get attr :label)))
-                    (when l (if (stringp l) l (format "%s" l)))))
+           (label (or (org-element-property :name table)
+                      (let ((l (plist-get attr :label)))
+                        (when l (if (stringp l) l (format "%s" l))))))
            (caption (when-let* ((c (org-export-get-caption table)))
                       (org-export-data c info)))
            (col-widths (org-quarto--table-col-widths table))
