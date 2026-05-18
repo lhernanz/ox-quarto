@@ -217,8 +217,8 @@ exports to:
 ```markdown
 | Col1       | Col2 | Col3 | Col4 |
 |:-----------|-----:|:----:|------|
-| Some stuff |    2 |    6 |   10 |
-| More stuff |    4 |    8 |   12 |
+| Some stuff | 2    | 6    | 10   |
+| More stuff | 4    | 8    | 12   |
 
 : This is a caption. {#tbl-example}
 ```
