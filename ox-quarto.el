@@ -578,9 +578,67 @@ callout titles)."
   "Transcode a TABLE-CELL element into a Markdown pipe table cell."
   (concat " " (org-trim (or contents "")) " |"))
 
+(defun org-quarto--repad-table-row (line col-widths)
+  "Pad cells in transcoded table row LINE to widths given by COL-WIDTHS.
+Each cell is left-aligned within its column so all pipes are vertically aligned.
+Returns the padded row string, or LINE unchanged when cell count mismatches."
+  (let* ((raw-cells (split-string (substring line 1) "|"))
+         (cells (if (string= "" (car (last raw-cells)))
+                    (butlast raw-cells)
+                  raw-cells)))
+    (if (/= (length cells) (length col-widths))
+        line
+      (concat "|"
+              (mapconcat
+               (lambda (i)
+                 (let* ((trimmed (string-trim (nth i cells)))
+                        (inner   (max 0 (- (nth i col-widths) 2)))
+                        (pad     (max 0 (- inner (length trimmed)))))
+                   (concat " " trimmed (make-string pad ?\s) " |")))
+               (number-sequence 0 (1- (length cells)))
+               "")))))
+
+(defun org-quarto--table-col-widths (table)
+  "Return a list of column widths for TABLE by parsing the rule row's raw text.
+The rule row (e.g. `|------------+------+------+------\\=') is read from the
+buffer; each segment between `|' and `+' gives the dash count for that column.
+Returns nil if TABLE has no rule row or buffer text is unavailable."
+  (let* ((rule-row (cl-find-if
+                    (lambda (row)
+                      (eq (org-element-property :type row) 'rule))
+                    (org-element-contents table)))
+         (beg (when rule-row (org-element-property :begin rule-row)))
+         (end (when rule-row (org-element-property :end rule-row))))
+    (when (and beg end)
+      (let* ((raw (string-trim (buffer-substring-no-properties beg end)))
+             (segments (split-string raw "[|+]" t)))
+        (mapcar (lambda (seg) (max 3 (length seg))) segments)))))
+
+(defun org-quarto--table-sep-row (col-widths align-spec)
+  "Build a Markdown pipe table separator row string.
+COL-WIDTHS is a list of integers (dash counts from the Org rule row).
+ALIGN-SPEC is a string of alignment characters, one per column:
+  l = left (:---), r = right (---:), c = center (:---:), other = default (---).
+Alignment colons replace dashes so each cell stays at the same total width."
+  (let ((aligns (when align-spec (string-to-list align-spec))))
+    (concat "|"
+            (mapconcat
+             (lambda (i)
+               (let* ((w (nth i col-widths))
+                      (a (when (and aligns (< i (length aligns))) (nth i aligns)))
+                      (sep (cond
+                            ((eq a ?l) (concat ":" (make-string (max 1 (1- w)) ?-)))
+                            ((eq a ?r) (concat (make-string (max 1 (1- w)) ?-) ":"))
+                            ((eq a ?c) (concat ":" (make-string (max 1 (- w 2)) ?-) ":"))
+                            (t (make-string (max 3 w) ?-)))))
+                 (concat sep "|")))
+             (number-sequence 0 (1- (length col-widths)))
+             ""))))
+
 (defun org-quarto-table-row (table-row contents _info)
   "Transcode a TABLE-ROW element into a Markdown pipe table row.
-Rule rows (separator lines in Org) become Markdown header separators."
+Rule rows become a fixed placeholder `| --- |' per column; the placeholder
+is replaced with proper widths and alignment by `org-quarto-table'."
   (if (eq (org-element-property :type table-row) 'rule)
       (let* ((table (org-element-parent table-row))
              (ncols (length (org-element-contents
@@ -593,10 +651,44 @@ Rule rows (separator lines in Org) become Markdown header separators."
 
 (defun org-quarto-table (table contents info)
   "Transcode a TABLE element into a Markdown pipe table.
-Only org-type tables are handled; table.el tables fall back to HTML."
-  (if (eq (org-element-property :type table) 'org)
-      contents
-    (org-html-table table contents info)))
+Only org-type tables are handled; table.el tables fall back to HTML.
+
+#+CAPTION sets the table caption.  #+ATTR_QUARTO: accepts:
+  :align   Alignment string, one character per column (l/r/c/other).
+           Colons replace dashes in the separator to indicate alignment.
+  :label   Cross-reference label emitted as `{#label}' after the caption.
+
+Multiple #+ATTR_QUARTO: lines are supported and merged."
+  (if (not (eq (org-element-property :type table) 'org))
+      (org-html-table table contents info)
+    (let* ((attr (org-export-read-attribute :attr_quarto table))
+           (align-spec (let ((a (plist-get attr :align)))
+                         (when a (if (stringp a) a (format "%s" a)))))
+           (label (let ((l (plist-get attr :label)))
+                    (when l (if (stringp l) l (format "%s" l)))))
+           (caption (when-let* ((c (org-export-get-caption table)))
+                      (org-export-data c info)))
+           (col-widths (org-quarto--table-col-widths table))
+           (processed
+            (if col-widths
+                (let ((lines (split-string contents "\n")))
+                  (mapconcat
+                   #'identity
+                   (mapcar (lambda (line)
+                             (cond
+                              ((string-match-p "^|\\( --- |\\)+" line)
+                               (org-quarto--table-sep-row col-widths align-spec))
+                              ((string-match-p "^|" line)
+                               (org-quarto--repad-table-row line col-widths))
+                              (t line)))
+                           lines)
+                   "\n"))
+              contents))
+           (caption-line (when (or label caption)
+                           (concat "\n: "
+                                   (or caption "")
+                                   (when label (concat " {#" label "}"))))))
+      (concat processed caption-line))))
 
 
 ;; Links

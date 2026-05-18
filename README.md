@@ -176,7 +176,7 @@ This is a collapsible note.
 
 ### Tables
 
-Org tables are exported as Markdown pipe tables. A horizontal rule in the Org table becomes the header separator row. `table.el`-style tables fall back to HTML export.
+Org tables are exported as Markdown pipe tables. A horizontal rule in the Org table becomes the header separator row, with dash counts matching the Org column widths. `table.el`-style tables fall back to HTML export.
 
 ```org
 | Column A | Column B |
@@ -189,9 +189,38 @@ exports to:
 
 ```markdown
 | Column A | Column B |
-| --- | --- |
-| foo | bar |
-| baz | qux |
+|----------|----------|
+| foo      | bar      |
+| baz      | qux      |
+```
+
+Use `#+CAPTION` for the table caption and `#+ATTR_QUARTO:` for alignment and cross-reference labels:
+
+| `#+ATTR_QUARTO:` key | Description |
+|:---|:---|
+| `:align` | Alignment string, one character per column: `l` (left), `r` (right), `c` (center), other (default). |
+| `:label` | Cross-reference label (e.g. `tbl-mytable`). |
+
+Multiple `#+ATTR_QUARTO:` lines are supported and merged.
+
+```org
+#+CAPTION: This is a caption.
+#+ATTR_QUARTO: :label tbl-example :align lrcd
+| Col1       | Col2 | Col3 | Col4 |
+|------------+------+------+------|
+| Some stuff |    2 |    6 |   10 |
+| More stuff |    4 |    8 |   12 |
+```
+
+exports to:
+
+```markdown
+| Col1       | Col2 | Col3 | Col4 |
+|:-----------|-----:|:----:|------|
+| Some stuff |    2 |    6 |   10 |
+| More stuff |    4 |    8 |   12 |
+
+: This is a caption. {#tbl-example}
 ```
 
 ### Code blocks
