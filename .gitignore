@@ -1,11 +1,4 @@
 examples/
-testfile*
-*.yml
+conversions/
+.agent-shell/
 Makefile
-*.docx
-*.html
-*.pdf
-*.bbl
-*.bib
-*.tex
-*.auctex-auto/
