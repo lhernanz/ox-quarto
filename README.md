@@ -285,4 +285,9 @@ For Quarto markup that is not covered by special blocks, you can pass native Qua
 
 ## Testing
 
-Over time I will try to add tests to the repository. Until then, I am doing ad hoc tests on Kubuntu 22.04. Please report issues on Windows or Mac.
+Over time I will try to add tests to the repository. Until then, I am doing ad hoc tests on:
+
+- Kubuntu 26.04
+- emacs 30.2 (doom 3.0.0-pre)
+
+Please report issues on Windows or Mac, or in other emacs configs.
