@@ -1,0 +1,46 @@
+#+TITLE: ox-quarto example file
+#+AUTHOR: ox-quarto contributors
+#+DATE: <2026-06-01 Mon>
+#+BIBLIOGRAPHY: ox-quarto-example.bib
+#+OPTIONS: toc:nil
+#+QUARTO_FRONTMATTER: ox-quarto-example.yaml
+#+QUARTO_PREVIEW_ARGS: --port 4444
+#+QUARTO_RENDER_ARGS: --to pdf --pdf-engine=lualatex
+
+* First heading
+
+** Margin
+
+This does not appear in the margin.
+
+#+BEGIN_column-margin
+This appears in the margin.
+#+END_column-margin
+
+#+BEGIN_callout-important :title "My Callout Title"
+Oh hai, Mark.
+#+END_callout-important
+
+** Additional attributes
+
+#+ATTR_QUARTO: :id my-note :collapse true
+#+BEGIN_callout-note :title "Collapsible note"
+This is a collapsible note.
+#+END_callout-note
+
+* Citations
+
+[cite:@abelsonStructureInterpretationComputer1996].
+
+* Source code blocks
+
+#+BEGIN_SRC R
+#| echo: false
+#| fig-cap: My figure's caption.
+hist(rnorm(100))
+#+END_SRC
+
+# Local Variables:
+# org-cite-global-bibliography: nil
+# citar-bibliography: nil
+# End:
