@@ -6,6 +6,5 @@ Makefile
 *.html
 *.pdf
 *.bbl
-*.bib
 *.tex
 *.auctex-auto/

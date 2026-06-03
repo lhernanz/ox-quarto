@@ -14,6 +14,8 @@ The package is in the early stages of development, and help from folks with more
 
 ## Usage
 
+An example file `ox-quarto-example.org` is provided that can be used to play with the features. It also serves as a refrence for examples of features.
+
 ### Document options
 
 For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of contents directly in the `.qmd` document. `ox-quarto` will use Org's `TITLE`, `AUTHOR`, `DATE`, and `BIBLIOGRAPHY` fields, if available. If you have multiple bibliographies, you can use multiple `#+BIBLIOGRAPHY:` lines and they will be properly formatted as a YAML array.
