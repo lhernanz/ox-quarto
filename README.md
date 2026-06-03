@@ -14,7 +14,7 @@ The package is in the early stages of development, and help from folks with more
 
 ## Usage
 
-An example file `ox-quarto-example.org` is provided that can be used to play with the features. It also serves as a refrence for examples of features.
+An example file `ox-quarto-example.org` is provided that can be used to play with the features. It also serves as a reference for examples of features.
 
 ### Document options
 
